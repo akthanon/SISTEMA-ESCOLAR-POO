@@ -504,7 +504,7 @@ const string CARPETA_PUBLICA = "public";
 
 ---
 
-## Paso 2 — Inicializar Winsock en Windows
+## Paso 2.A — Inicializar Winsock en Windows
 
 Dentro de `main`, al inicio:
 
@@ -526,7 +526,19 @@ int main() {
     return 0;
 }
 ```
+## Paso 2.B — Inicializar Winsock en Linux
 
+Dentro de `main`, al inicio:
+
+```cpp
+int main() {
+    // En Linux no es necesario inicializar Winsock.
+
+    // ... resto del código
+
+    return 0;
+}
+```
 ---
 
 ## Paso 3 — Crear el socket del servidor
