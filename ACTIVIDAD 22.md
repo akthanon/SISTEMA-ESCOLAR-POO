@@ -530,7 +530,7 @@ Si `rutaSegura` devuelve `false`, respondemos con `400 Bad Request`. Esto evita 
 Reemplaza el bloque del paso 9 de la actividad 21 por:
 
 ```cpp
-string metodo = ...; // extraído también de la primera línea
+string metodo = peticion.substr(0, peticion.find(' '));
 string ruta   = extraerRuta(peticion);
 ruta = normalizarRuta(ruta);
 
