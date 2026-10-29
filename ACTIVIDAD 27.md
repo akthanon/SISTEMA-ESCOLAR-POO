@@ -369,7 +369,7 @@ En vez del envío tradicional (`application/x-www-form-urlencoded` que recarga l
 
 ## Paso 1 — Ajustar el formulario
 
-En `public/index.html`, el form de registro ya debe existir. Verifica que tenga un `id`:
+En `index.html o en registro.html (donde estés manejando la lógica)`, el form de registro ya debe existir. Verifica que tenga un `id`:
 
 ```html
 <form id="form-alumno">
@@ -484,23 +484,16 @@ DevTools → Network → filtro Fetch/XHR.
 
 ## Paso 6 — Manejo de errores y limpieza
 
-```js
-finally {
-  document.querySelector('#btn-registrar').disabled = false;
-}
-```
-
-Cambia el botón para tener `id`:
+Cambia el botón para tener `id` en registro.html y en index.html (donde estés manejando la lógica):
 
 ```html
 <button type="submit" id="btn-registrar">Registrar</button>
 ```
 
-Y al inicio del listener:
+Y al inicio del listener en app.js:
 
 ```js
 const boton = document.querySelector('#btn-registrar');
-boton.disabled = true;
 ```
 
 ---
