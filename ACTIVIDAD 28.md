@@ -557,7 +557,7 @@ if (ruta == "/api/alumnos" && metodo == "POST") {
 
 ## Paso 7 — Usar `leerPeticionCompleta`
 
-En el bucle principal, reemplaza la lectura original:
+En el bucle principal, reemplaza la lectura original (ejemplo):
 
 ```cpp
 socket_t cliente = accept(servidor, (sockaddr*)&clienteDir, &tam);
@@ -569,6 +569,61 @@ string ruta   = normalizarRuta(extraerRuta(peticion));
 string cuerpo = extraerCuerpo(peticion);
 
 cout << "[REQ] " << metodo << " " << ruta << endl;
+
+```
+¿Cómo hacerlo?
+
+En tu archivo actual esa zona se ve así (es lo que hay que reemplazar):
+```
+        socket_t cliente = accept(servidor, (sockaddr*)&clienteDir, &tam);// ❌ borrar
+        if (cliente == INVALID_SOCKET) {// ❌ borrar
+            cerr << "Error en accept" << endl;// ❌ borrar
+            continue;// ❌ borrar
+        }// ❌ borrar
+
+        char buffer[4096] = {0};                       // ❌ borrar
+        int bytes = recv(cliente, buffer, sizeof(buffer) - 1, 0);   // ❌ borrar
+        if (bytes <= 0) {                              // ❌ borrar
+            CLOSE_SOCKET(cliente);                     // ❌ borrar
+            continue;                                  // ❌ borrar
+        }                                              // ❌ borrar
+        string peticion(buffer, bytes);                // ❌ borrar
+
+        // Loguear la primera línea (método + ruta)
+        size_t finLinea = peticion.find("\r\n");       // ❌ borrar
+        string primeraLinea = (finLinea != string::npos)  // ❌ borrar
+                            ? peticion.substr(0, finLinea) // ❌ borrar
+                            : peticion;                // ❌ borrar
+        cout << "[REQ] " << primeraLinea << endl;      // ❌ borrar
+
+        // Por ahora: siempre devolvemos index.html
+        string metodo = peticion.substr(0, peticion.find(' '));  // ❌ borrar
+        string ruta   = extraerRuta(peticion);         // ❌ borrar
+        ruta = normalizarRuta(ruta);                   // ❌ (se reemplaza)
+```
+✅ Instrucción (el nuevo bloque)
+
+Sustituye todo lo anterior por esto:
+
+```
+        socket_t cliente = accept(servidor, (sockaddr*)&clienteDir, &tam);
+        if (cliente == INVALID_SOCKET) {
+            cerr << "Error en accept" << endl;
+            continue;
+        }
+
+        // Leer la petición COMPLETA (cabeceras + cuerpo según Content-Length)
+        string peticion = leerPeticionCompleta(cliente);
+        if (peticion.empty()) {
+            CLOSE_SOCKET(cliente);
+            continue;
+        }
+
+        string metodo = extraerMetodo(peticion);
+        string ruta   = normalizarRuta(extraerRuta(peticion));
+        string cuerpo = extraerCuerpo(peticion);   // 👈 el cuerpo del POST
+
+        cout << "[REQ] " << metodo << " " << ruta << endl;
 ```
 
 ---
