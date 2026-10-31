@@ -427,7 +427,15 @@ usuarios.txt → servidor C++ → JSON → respuesta HTTP → fetch → tabla HT
 
 ---
 
+# Actividad 30 
+
+A continuación tienes **todos** los pasos con los arreglos aplicados. Los cambios respecto a la versión original están marcados con 🔧.
+
+---
+
 ## Paso 1 — Estructura del JSON de salida
+
+Sin cambios. El JSON que produce `alumnosAJSON()` es exactamente este:
 
 ```json
 [
@@ -441,7 +449,9 @@ usuarios.txt → servidor C++ → JSON → respuesta HTTP → fetch → tabla HT
 
 ---
 
-## Paso 2 — Función: escapar strings para JSON
+## Paso 2 — Escapar strings para JSON
+
+Sin cambios a no ser que lo hayas modificado. `escaparJSON` ya está en tu `#ifdef _WIN32.txt`. Verifica que esté igual.
 
 ```cpp
 string escaparJSON(const string& s) {
@@ -460,11 +470,11 @@ string escaparJSON(const string& s) {
 }
 ```
 
-🎯 Sin esto, un nombre con comillas rompe el JSON entero.
-
 ---
 
-## Paso 3 — Función: vector → JSON
+## Paso 3 — Vector → JSON
+
+Sin cambios a no ser que lo hayas modificado. `alumnosAJSON()` ya está en tu `#ifdef _WIN32.txt`. Verifica que esté igual.
 
 ```cpp
 string alumnosAJSON() {
@@ -483,29 +493,100 @@ string alumnosAJSON() {
 }
 ```
 
-⚠️ Observa:
-- `"edad":20` → **sin comillas** (es número).
-- Sin coma tras el último objeto.
+> ⚠️ `"edad":20` **sin** comillas (es número). Sin coma tras el último objeto.
 
 ---
 
-## Paso 4 — Handler GET /api/alumnos
+## Paso 4 — 🔧 Handler `GET /api/alumnos` (FALTABA)
+
+En tu archivo `#ifdef _WIN32.txt`, dentro de `manejarAPI(...)`, **ya existe** el handler de `POST /api/alumnos`, pero **falta el de `GET`**. Sin él, `fetch('/api/alumnos')` sin método cae al `404 Endpoint no encontrado`.
+
+### 🔧 Inserción exacta
+
+Busca este bloque dentro de `manejarAPI`:
 
 ```cpp
-if (ruta == "/api/alumnos" && metodo == "GET") {
-    string json = alumnosAJSON();
-    cout << "[GET] /api/alumnos → " << alumnos.size() << " registros\n";
-    return construirRespuesta(200, "application/json; charset=utf-8", json);
-}
+    if (ruta == "/api/alumnos" && metodo == "POST") {
 ```
 
-⚠️ Si `alumnos` está vacío, el JSON es `[]`. Eso NO es un 404.
+Y **justo encima** de él, añade:
+
+```cpp
+    if (ruta == "/api/alumnos" && metodo == "GET") {
+        string json = alumnosAJSON();
+        cout << "[GET] /api/alumnos → " << alumnos.size() << " registros\n";
+        return construirRespuesta(200, "application/json; charset=utf-8", json);
+    }
+
+    if (ruta == "/api/alumnos" && metodo == "POST") {
+        // ... tu handler POST existente, sin tocar
+```
+
+### 🔧 También añade el código `409` en `construirRespuesta` (si no lo tienes aún)
+
+```cpp
+        case 409: estado = "409 Conflict"; break;
+```
+
+> 💡 Ya lo tienes desde la actividad 28 (matrícula duplicada), pero verifícalo — sin esa línea una matrícula repetida devuelve `500` en el estado HTTP.
+
+### Verificación en crudo
+
+```bash
+curl -i http://localhost:8081/api/alumnos
+```
+
+Debe responder:
+
+```
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+Content-Length: 73
+
+[{"nombre":"Juan","edad":20,"matricula":"A001"}]
+```
+
+> Si `alumnos` está vacío, el body es `[]`. **Eso no es un 404.**
 
 ---
 
-## Paso 5 — Tabla en el HTML
+## Paso 5 — 🔧 Tabla en el HTML (con limpieza)
 
-En `public/index.html`:
+El `<section id="lista">` de tu `public/index.html` ya está bien. **Pero** hay dos problemas de HTML en el mismo archivo que te van a molestar al probar:
+
+### 5.1 — Verifica que el `<form>` apunta a tu localhost
+
+ejemplo mal
+```html
+<form id="form-alumno" action="http://192.168.67.185:8081" method="get">
+```
+
+Con `preventDefault()` no se usa, pero si algún handler falla el navegador manda un GET a esa IP. 🔧 Cámbialo a:
+
+```html
+<form id="form-alumno" action="/api/alumnos" method="post">
+```
+
+### 5.2 — Link suelto dentro del `<nav>`
+
+```html
+<nav>
+  <ul>
+    <li><a href="#inicio">Inicio</a></li>
+    <a href="/registro.html">Registrar alumno</a>   <!-- ⚠️ fuera de <li> -->
+    <li><a href="#lista">Lista de alumnos</a></li>
+    <li><a href="#resumen">Resumen</a></li>
+  </ul>
+</nav>
+```
+
+🔧 Envuélvelo:
+
+```html
+    <li><a href="/registro.html">Registrar alumno</a></li>
+```
+
+### 5.3 — El `<section id="lista">` se queda de esta forma, si está igual no lo modifiques.
 
 ```html
 <section id="lista">
@@ -529,27 +610,33 @@ En `public/index.html`:
 
 ---
 
-## Paso 6 — Consumir con fetch
+## Paso 6 — 🔧 Consumir con fetch (con `cargarAlumnos` limpio)
 
-En `app.js`:
+Tu `app.js` **ya tiene** `cargarAlumnos` y `renderizarTabla`, pero tienen tienes que verificar lo siguiente.
+
+### 🔧 Si lo tienes diferente reemplaza el bloque `cargarAlumnos` / `renderizarTabla` del final de `app.js` por este:
 
 ```js
-const tbody        = document.querySelector('#tabla-alumnos tbody');
-const tablaEstado  = document.querySelector('#tabla-estado');
-const btnActualizar = document.querySelector('#btn-actualizar');
+// ===== Actividad 30: tabla + resumen desde el servidor =====
+
+const tbody          = document.querySelector('#tabla-alumnos tbody');
+const tablaEstado    = document.querySelector('#tabla-estado');
+const btnActualizar  = document.querySelector('#btn-actualizar');
 
 async function cargarAlumnos() {
+  if (!tbody) return;                       // página sin tabla
   tablaEstado.textContent = 'Cargando...';
-  btnActualizar.disabled = true;
+  btnActualizar.disabled  = true;
 
   try {
     const res = await fetch('/api/alumnos');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-    const alumnos = await res.json();
-    renderizarTabla(alumnos);
+    const lista = await res.json();         // 🔧 renombrado: no choca con `alumnos` global
+    renderizarTabla(lista);
+    actualizarResumenDesdeServidor(lista);  // 🔧 mini‑reto: total + promedio de edades
 
-    tablaEstado.textContent = `${alumnos.length} alumno(s)`;
+    tablaEstado.textContent = `${lista.length} alumno(s)`;
   } catch (err) {
     tablaEstado.textContent = `Error: ${err.message}`;
     console.error(err);
@@ -558,10 +645,10 @@ async function cargarAlumnos() {
   }
 }
 
-function renderizarTabla(alumnos) {
+function renderizarTabla(lista) {
   tbody.innerHTML = '';
 
-  if (alumnos.length === 0) {
+  if (lista.length === 0) {
     const fila = document.createElement('tr');
     const td   = document.createElement('td');
     td.colSpan = 3;
@@ -572,78 +659,231 @@ function renderizarTabla(alumnos) {
     return;
   }
 
-  alumnos.forEach((a) => {
+  lista.forEach((a) => {
     const tr = document.createElement('tr');
 
-    const tdMat = document.createElement('td');
-    tdMat.textContent = a.matricula;
-
-    const tdNom = document.createElement('td');
-    tdNom.textContent = a.nombre;
-
+    const tdMat  = document.createElement('td');
+    tdMat.textContent  = a.matricula;
+    const tdNom  = document.createElement('td');
+    tdNom.textContent  = a.nombre;
     const tdEdad = document.createElement('td');
     tdEdad.textContent = a.edad;
 
     tr.appendChild(tdMat);
     tr.appendChild(tdNom);
     tr.appendChild(tdEdad);
-
     tbody.appendChild(tr);
   });
+}
+
+// 🔧 Mini‑reto: resumen calculado en el cliente a partir del JSON del servidor
+function actualizarResumenDesdeServidor(lista) {
+  const total    = document.querySelector('#total-alumnos');
+  const promedio = document.querySelector('#promedio-general');
+  const ultimo   = document.querySelector('#ultimo-alumno');
+  if (!total || !promedio || !ultimo) return;
+
+  total.textContent = lista.length;
+
+  if (lista.length === 0) {
+    promedio.textContent = '—';
+    ultimo.textContent   = '—';
+    return;
+  }
+
+  const sumaEdades = lista.reduce((acc, a) => acc + Number(a.edad), 0);
+  promedio.textContent = (sumaEdades / lista.length).toFixed(1);
+  ultimo.textContent   = lista[lista.length - 1].nombre;
 }
 
 btnActualizar.addEventListener('click', cargarAlumnos);
 document.addEventListener('DOMContentLoaded', cargarAlumnos);
 ```
 
-🎯 `textContent` en lugar de `innerHTML` → evita XSS.
+> 🎯 `textContent` (no `innerHTML`) al pintar celdas → evita XSS si un nombre trae `<script>`.
 
 ---
 
-## Paso 7 — Refrescar tras un POST
+## Paso 6‑bis — 🔧 Limpieza obligatoria de `app.js` (FIXES EN CASOS DE ERRORES)
 
-En el listener del `submit` (actividad 27), después de éxito:
+Si tienes **tres** `submit` sobre el mismo `formAlumno` y **dos** `consultarAPI` que están duplicadas tienes que eliminarlas inmediatamente. Ej al registrarse los tres handlers corren en cascada y dejan la UI inconsistente.
+
+### 🔧 Borra el primer `submit` (el “básico”)
 
 ```js
-formAlumno.reset();
-await cargarAlumnos();   // ← refresca la tabla
+// ❌ BORRAR 
+if (formAlumno && resultado) formAlumno.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const nombre = document.querySelector('#nombre').value.trim();
+  if (nombre === '') { ... }
+  resultado.textContent = `Alumno "${nombre}" listo para registrar ...`;
+  ...
+});
 ```
+
+### 🔧 Borra el segundo `submit` (el que crea `Alumno` local)
+
+```js
+// ❌ BORRAR 
+if (formAlumno && document.querySelector('#tabla-alumnos tbody'))
+  formAlumno.addEventListener('submit', (e) => {
+    e.preventDefault();
+    // ... crea new Alumno(...), alumnos.push(...), render(), etc.
+  });
+```
+
+> Ese handler empujaba el alumno **solo al array del navegador**. Con la tabla ahora alimentada por el servidor, ese alumno “fantasma” desaparecía en el siguiente `cargarAlumnos()`.
+
+### 🔧 Borra la primera `consultarAPI` (la que no recibe `boton`)
+
+```js
+// ❌ BORRAR
+async function consultarAPI(endpoint) {
+  apiResultado.textContent = 'Cargando...';
+  // ...
+}
+```
+
+Se queda **solo** la segunda, que sí recibe `boton` y lo deshabilita.
+
+### 🔧 Y como `render()` / `actualizarResumen()` quedaron huérfanos
+
+Puedes dejarlos (no rompen) o borrarlos. Recomiendo borrar sus llamadas:
+
+```js
+// ❌ BORRAR esta línea suelta al final de las clases:
+render();   // pinta la tabla vacía al cargar
+```
+
+La tabla vacía la pinta `cargarAlumnos()` en `DOMContentLoaded`.
+
+> ✅ Con esto el **único** origen de verdad es el servidor. Lo que ves en la tabla = lo que hay en `data/usuarios.txt`.
+
+---
+
+## Paso 7 — 🔧 Refrescar tras un POST
+
+El listener `async` del submit final termina en `formAlumno.reset();` pero **no vuelve a pedir la lista**. Resultado: registras un alumno, el servidor lo guarda, y la tabla no se actualiza hasta pulsar *Actualizar*.
+
+### 🔧 Localiza el bloque `fetch('/api/alumnos', { method: 'POST', ... })` y añade la línea marcada:
+
+```js
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const texto = await res.text();
+    apiResultado.textContent = `Servidor respondió: ${texto}`;
+    apiResultado.classList.remove('error');
+
+    formAlumno.reset();
+    await cargarAlumnos();          // 🔧 refresca tabla + resumen desde el servidor
+  } catch (err) {
+    apiResultado.textContent = `Error: ${err.message}`;
+    apiResultado.classList.add('error');
+  }
+```
+
+> ✅ `cargarAlumnos` es una *function declaration* → se hoistea, así que puedes llamarla desde arriba sin reordenar nada.
 
 ---
 
 ## Paso 8 — Verificar todo
 
-1. Levanta el servidor.
-2. Abre `http://localhost:8080/`.
-3. Al cargar, la tabla aparece con los datos de `usuarios.txt`.
-4. Registra un alumno nuevo → la tabla se actualiza automáticamente.
-5. Pulsa **Actualizar** → vuelve a pedir la lista al servidor.
-6. Abre `usuarios.txt` y edítalo a mano (borra una línea). Pulsa Actualizar → la tabla refleja el cambio.
-7. Reinicia el servidor → los datos siguen ahí.
+```bash
+# 1) Backend en crudo
+curl -i http://localhost:8081/api/alumnos
+#  → HTTP/1.1 200 OK + application/json + [...]
+
+# 2) POST + GET combinados
+curl -i -X POST -H "Content-Type: application/json" \
+  -d '{"nombre":"Ana","edad":20,"matricula":"A003"}' \
+  http://localhost:8081/api/alumnos
+#  → 200 "Alumno Ana registrado."
+
+curl http://localhost:8081/api/alumnos
+#  → ahora incluye a Ana
+
+# 3) Duplicado
+curl -i -X POST -H "Content-Type: application/json" \
+  -d '{"nombre":"Otra","edad":22,"matricula":"A003"}' \
+  http://localhost:8081/api/alumnos
+#  → 409 Conflict
+```
+
+En el navegador (`http://localhost:8081/`):
+
+1. Al cargar la página: tabla aparece con los datos de `data/usuarios.txt` y el resumen muestra `total`, `promedio de edades`, `último alumno`.
+2. Registrar un alumno nuevo → aparece de inmediato en la tabla **sin pulsar Actualizar**.
+3. Botón *Actualizar* → vuelve a pedir la lista al servidor.
+4. Edita `data/usuarios.txt` a mano (borra una línea). Pulsa *Actualizar* → tabla refleja el cambio.
+5. Reinicia el servidor → los datos siguen ahí (persistencia).
+6. Matrícula repetida → mensaje de error en `apiResultado`, estado 409 en Network.
+
+En consola del servidor, tras cada registro verás la traza:
+
+```
+[REQ] POST /api/alumnos
+[POST] Alumno guardado: Ana (A003)
+[REQ] GET /api/alumnos
+[GET] /api/alumnos → 3 registros
+```
+
+> 🔎 El `[GET]` justo después del `[POST]` es la prueba de que el fix del Paso 7 está activo.
 
 ---
 
-## Paso 9 — Ver en DevTools
+## Paso 9 — DevTools
 
-DevTools → Network → filtro Fetch/XHR:
-- `GET /api/alumnos` → 200.
-- Response → el JSON con los alumnos.
+DevTools → **Network** → filtro **Fetch/XHR**:
 
-Y en **Preview** puedes ver el JSON en forma de árbol.
+| Petición | Estado | Response |
+|----------|--------|----------|
+| `GET /api/alumnos` (al cargar) | `200` | array con los alumnos |
+| `POST /api/alumnos` (al registrar) | `200` | `Alumno X registrado.` |
+| `GET /api/alumnos` (refresco) | `200` | array actualizado |
+| `POST` duplicado | `409` | `Matrícula duplicada` |
+
+En la pestaña **Preview** del GET puedes inspeccionar el JSON como árbol.
 
 ---
 
-## ✅ Checklist de la Actividad 30
+## 🧠 Mini‑reto — Total de alumnos + promedio de edades (implementado en Paso 6)
 
-- [ ] `GET /api/alumnos` responde `application/json`.
-- [ ] El JSON tiene la forma `[{"nombre":...,"edad":...,"matricula":...}, ...]`.
-- [ ] La tabla se llena al abrir la página.
-- [ ] El botón Actualizar refresca sin recargar.
-- [ ] Registrar un alumno refresca la tabla automáticamente.
-- [ ] Se usa `textContent` para insertar valores.
+Ya está implementado en `actualizarResumenDesdeServidor(lista)` arriba. Reutiliza las tarjetas que **ya tienes** en el HTML:
 
-## 🧠 Mini-reto
-Muestra en un `<div>` aparte el total de alumnos y el promedio de edades, calculados en el cliente con los datos del JSON.
+```html
+<section id="resumen" class="tarjetas">
+  <div class="card">
+    <h3>Total alumnos</h3>
+    <p id="total-alumnos">0</p>
+  </div>
 
+  <div class="card">
+    <h3>Promedio de edades</h3>       <!-- 🔧 cambia el label: ahora es edades -->
+    <p id="promedio-general">—</p>
+  </div>
+
+  <div class="card">
+    <h3>Último registrado</h3>
+    <p id="ultimo-alumno">—</p>
+  </div>
+</section>
+```
+
+> ⚠️ Ojo con la semántica: el card antes decía “Promedio general” (calificaciones) y lo llenaba `actualizarResumen()` desde la clase `Alumno`. Ahora lo llena `actualizarResumenDesdeServidor()` con el **promedio de edades** del JSON → cambia el `<h3>` como arriba para que no mienta.
+>
+> 🔧 Si además quieres evitar que los IDs queden duplicados o que `actualizarResumen()` (la vieja) sobrescriba las tarjetas con datos locales, borra la función `actualizarResumen()` antigua (la que hacía `a.promedio`) al limpiar el Paso 6‑bis.
+
+---
+
+## ✅ Checklist final de la Actividad 30
+
+- [x] `GET /api/alumnos` responde `application/json` (Paso 4 🔧)
+- [x] JSON con forma `[{"nombre":…,"edad":…,"matricula":…}]` (Paso 3)
+- [x] Tabla se llena al abrir la página (Paso 6, `DOMContentLoaded`)
+- [x] Botón *Actualizar* refresca sin recargar (Paso 6)
+- [x] Registrar alumno refresca la tabla automáticamente (Paso 7 🔧)
+- [x] Se usa `textContent` para insertar valores (Paso 6)
+- [x] Sin handlers duplicados que pisen la fuente de verdad (Paso 6‑bis 🔧)
+- [x] Resumen (total + promedio de edades + último) calculado en cliente desde el JSON (mini‑reto)
 ---
 
