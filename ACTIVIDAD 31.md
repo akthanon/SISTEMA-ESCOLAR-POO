@@ -411,7 +411,10 @@ let matriculaEditando = null;
 # PASO A PASO
 
 ---
-# Actividad 31 — CRUD completo de alumnos
+
+# Actividad 31 — CRUD completo de alumnos (PASO A PASO corregido)
+
+> **Cambios respecto a la versión anterior:** se añade un **Paso 0** de limpieza (indispensable), se marcan con **⚠️ REEMPLAZA — no añadas** los pasos donde se pisaba código de la actividad 30, se muestra la función `renderizarTabla` **completa** (incluido el caso de lista vacía), se explícita la declaración de variables de estado y se integra el mini‑reto **Cancelar**.
 
 ## Objetivo
 Implementar **Create, Read, Update, Delete** sobre `/api/alumnos` en C++ y consumirlos desde el frontend. Todos los cambios se persisten en `usuarios.txt`.
@@ -429,7 +432,25 @@ Usamos la **matrícula** como identificador único (es clave natural del alumno)
 
 ---
 
-## Paso 1 — Función: buscar por matrícula
+## Paso 0 — Limpieza previa (⚠️ NO omitir)
+
+Antes de añadir nada, **borra** en `app.js` todo el código de las actividades 29–30 que ahora va a ser sustituido. Si se queda duplicado, se disparan **dos peticiones por cada operación** (doble POST = alumnos duplicados).
+
+Elimina:
+
+- `let alumnos = [];` (el array local de la actividad anterior)
+- La función `render()` vieja (la que pinta con `alumno.calificaciones` y `alumno.promedio`)
+- La función `actualizarResumen()` vieja (la que usa promedios de calificaciones)
+- El listener `cuerpoTabla.addEventListener('click', ...)` viejo (el que usa `fila.dataset.id`)
+- Las funciones `editarAlumno(id)` y `eliminarAlumno(id)` basadas en `id` numérico
+- El `formAlumno.addEventListener('submit', ...)` viejo (el que hace `fetch('/api/alumnos', { method: 'POST', ... })` con `correo` y sin distinguir crear/editar)
+- Los `forEach` duplicados sobre `[data-endpoint]` — deja **uno solo**
+
+Las clases `Persona`, `Alumno`, `Maestro`, `Administrador` **no las usa el CRUD**; puedes conservarlas al final como referencia o eliminarlas también.
+
+---
+
+## Paso 1 — Función auxiliar: buscar por matrícula (C++)
 
 ```cpp
 int buscarPorMatricula(const string& matricula) {
@@ -442,17 +463,16 @@ int buscarPorMatricula(const string& matricula) {
 
 ---
 
-## Paso 2 — CREATE (ya lo tienes de la actividad 29)
+## Paso 2 — CREATE
 
-El handler de `POST /api/alumnos`:
+`POST /api/alumnos`:
+
 1. Parsea el cuerpo.
 2. Valida campos.
-3. Rechaza matrícula duplicada con 409.
+3. Rechaza matrícula duplicada con **409**.
 4. Agrega al vector.
 5. Guarda el archivo.
-6. Responde 201 Created.
-
-Ajuste: cambia el 200 por **201** y devuelve el recurso creado en JSON:
+6. Responde **201** con el recurso creado.
 
 ```cpp
 if (ruta == "/api/alumnos" && metodo == "POST") {
@@ -487,13 +507,13 @@ if (ruta == "/api/alumnos" && metodo == "POST") {
 
 ---
 
-## Paso 3 — READ (ya lo tienes de la actividad 30)
+## Paso 3 — READ
 
-Si quieres `GET /api/alumnos/{matricula}` para un alumno individual:
+`GET /api/alumnos` ya funciona desde la actividad 30. Opcionalmente puedes añadir `GET /api/alumnos/{matricula}` para un alumno individual:
 
 ```cpp
 if (ruta.rfind("/api/alumnos/", 0) == 0 && metodo == "GET") {
-    string matricula = ruta.substr(13);   // longitud de "/api/alumnos/"
+    string matricula = ruta.substr(13);   // strlen("/api/alumnos/")
     int idx = buscarPorMatricula(matricula);
     if (idx == -1) {
         return construirRespuesta(404, "application/json; charset=utf-8",
@@ -510,6 +530,8 @@ if (ruta.rfind("/api/alumnos/", 0) == 0 && metodo == "GET") {
 ---
 
 ## Paso 4 — UPDATE
+
+`PUT /api/alumnos/{matricula}`. La matrícula **no se modifica** (es la clave).
 
 ```cpp
 if (ruta.rfind("/api/alumnos/", 0) == 0 && metodo == "PUT") {
@@ -529,7 +551,6 @@ if (ruta.rfind("/api/alumnos/", 0) == 0 && metodo == "PUT") {
                                   "{\"error\":\"Datos inválidos\"}");
     }
 
-    // Actualizar (matrícula inmutable)
     Alumno respaldo = alumnos[idx];
     alumnos[idx].nombre = d.nombre;
     alumnos[idx].edad   = d.edad;
@@ -575,78 +596,131 @@ if (ruta.rfind("/api/alumnos/", 0) == 0 && metodo == "DELETE") {
 }
 ```
 
-🎯 El respaldo + reversión mantiene la coherencia entre memoria y archivo si la escritura falla.
+El respaldo + reversión mantiene la coherencia entre memoria y archivo si la escritura falla.
 
 ---
 
-## Paso 6 — Columna de acciones en la tabla
+## Paso 6 — Tabla HTML: 4 columnas + acciones
 
-Actualiza el `<thead>`:
+**Reemplaza** el `<thead>` completo. Si tu tabla venía de actividades anteriores con 10 columnas (nombre, edad, correo, calificaciones 1‑4, promedio, acciones), **elimina las columnas que sobran**; el JS de este paso solo pinta 4.
 
 ```html
-<tr>
-  <th>Matrícula</th>
-  <th>Nombre</th>
-  <th>Edad</th>
-  <th>Acciones</th>
-</tr>
+<thead>
+  <tr>
+    <th>Matrícula</th>
+    <th>Nombre</th>
+    <th>Edad</th>
+    <th>Acciones</th>
+  </tr>
+</thead>
 ```
 
-Y en `renderizarTabla`, añade la celda con botones:
+> Si prefieres conservar la columna de correo, añádela en `<thead>` y también en el JS del Paso 7 (`tdCorreo`). Recuerda que el modelo C++ **no guarda correo**; solo lo tendrías si amplías el backend.
+
+---
+
+## Paso 7 — `renderizarTabla` completa (⚠️ REEMPLAZA la anterior)
+
+Sustituye la función `renderizarTabla` que tenías. Incluye el caso de **lista vacía** (que provocaba `ReferenceError` si `tbody` se llenaba con `a.matricula` fuera del `forEach`) y añade `data-matricula` a cada fila, que usaremos en el Paso 8.
 
 ```js
-const tdAcciones = document.createElement('td');
-tdAcciones.className = 'acciones';
+function renderizarTabla(lista) {
+  if (!tbody) return;
+  tbody.innerHTML = '';
 
-const btnEditar = document.createElement('button');
-btnEditar.textContent = 'Editar';
-btnEditar.dataset.accion = 'editar';
-btnEditar.dataset.matricula = a.matricula;
+  // ── Caso lista vacía ─────────────────────────────
+  if (!lista || lista.length === 0) {
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = 4;
+    td.className = 'vacio';
+    td.textContent = 'Sin alumnos registrados';
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+    return;
+  }
 
-const btnEliminar = document.createElement('button');
-btnEliminar.textContent = 'Eliminar';
-btnEliminar.dataset.accion = 'eliminar';
-btnEliminar.dataset.matricula = a.matricula;
+  // ── Filas ────────────────────────────────────────
+  lista.forEach((a) => {
+    const tr = document.createElement('tr');
+    tr.dataset.matricula = a.matricula;
 
-tdAcciones.appendChild(btnEditar);
-tdAcciones.appendChild(btnEliminar);
+    const tdMat  = document.createElement('td');
+    tdMat.textContent  = a.matricula;
 
-tr.appendChild(tdAcciones);
+    const tdNom  = document.createElement('td');
+    tdNom.textContent  = a.nombre;
+
+    const tdEdad = document.createElement('td');
+    tdEdad.textContent = a.edad;
+
+    const tdAcciones = document.createElement('td');
+    tdAcciones.className = 'acciones';
+
+    const btnEditar = document.createElement('button');
+    btnEditar.textContent = 'Editar';
+    btnEditar.dataset.accion    = 'editar';
+    btnEditar.dataset.matricula = a.matricula;
+
+    const btnEliminar = document.createElement('button');
+    btnEliminar.textContent = 'Eliminar';
+    btnEliminar.dataset.accion    = 'eliminar';
+    btnEliminar.dataset.matricula = a.matricula;
+
+    tdAcciones.appendChild(btnEditar);
+    tdAcciones.appendChild(btnEliminar);
+
+    tr.appendChild(tdMat);
+    tr.appendChild(tdNom);
+    tr.appendChild(tdEdad);
+    tr.appendChild(tdAcciones);
+    tbody.appendChild(tr);
+  });
+}
+```
+
+`actualizarResumenDesdeServidor(lista)` puede quedar tal cual la tienes (usa `a.edad` para el promedio de edades).
+
+---
+
+## Paso 8 — Delegación de eventos (⚠️ REEMPLAZA, no añadas)
+
+**Borra** el listener viejo `cuerpoTabla.addEventListener('click', ...)` que usaba `fila.dataset.id`. Deja **un solo** listener sobre `tbody`, y protégelo por si `tbody` no existe en esa página:
+
+```js
+if (tbody) {
+  tbody.addEventListener('click', (e) => {
+    const boton = e.target.closest('button[data-accion]');
+    if (!boton) return;
+
+    const matricula = boton.dataset.matricula;
+    const accion    = boton.dataset.accion;
+
+    if (accion === 'editar')   editarAlumno(matricula);
+    if (accion === 'eliminar') eliminarAlumno(matricula);
+  });
+}
 ```
 
 ---
 
-## Paso 7 — Delegación de eventos en la tabla
+## Paso 9 — Modo edición en el formulario
+
+### 9.1 Declara el estado al inicio del archivo
+
+Al principio del script (junto a los `querySelector`), **declara** estas variables. Sin esto, `'use strict'` lanza `ReferenceError` al entrar en modo edición:
 
 ```js
-tbody.addEventListener('click', (e) => {
-  const boton = e.target.closest('button[data-accion]');
-  if (!boton) return;
-
-  const matricula = boton.dataset.matricula;
-  const accion    = boton.dataset.accion;
-
-  if (accion === 'editar')   editarAlumno(matricula);
-  if (accion === 'eliminar') eliminarAlumno(matricula);
-});
-```
-
----
-
-## Paso 8 — Modo edición en el formulario
-
-Reutilizamos el mismo formulario. Variable de estado:
-
-```js
-let modoEdicion = false;
+let modoEdicion       = false;
 let matriculaEditando = null;
 ```
 
-**Editar** → rellenar campos y marcar modo:
+### 9.2 Rellena el formulario al pulsar Editar
 
 ```js
 function editarAlumno(matricula) {
-  // Buscar en la tabla actual
+  if (!tbody) return;
+
   const fila = [...tbody.querySelectorAll('tr')].find(
     tr => tr.children[0]?.textContent === matricula
   );
@@ -656,104 +730,213 @@ function editarAlumno(matricula) {
   document.querySelector('#edad').value      = fila.children[2].textContent;
   document.querySelector('#matricula').value = matricula;
 
+  // El modelo del servidor NO devuelve correo; lo limpiamos
+  const correoInput = document.querySelector('#correo');
+  if (correoInput) correoInput.value = '';
+
   modoEdicion = true;
   matriculaEditando = matricula;
 
-  const btn = document.querySelector('#form-alumno button[type="submit"]');
-  btn.textContent = 'Guardar cambios';
+  const submitBtn = formAlumno?.querySelector('button[type="submit"]');
+  if (submitBtn) submitBtn.textContent = 'Guardar cambios';
 
-  // Bloquear el campo matrícula
-  document.querySelector('#matricula').readOnly = true;
+  const matInput = document.querySelector('#matricula');
+  if (matInput) matInput.readOnly = true;
+
+  mostrarBotonCancelar(true);
 }
-```
-
-Ajusta el listener del `submit` para decidir POST o PUT:
-
-```js
-formAlumno.addEventListener('submit', async (e) => {
-  e.preventDefault();
-
-  const datos = {
-    nombre:    document.querySelector('#nombre').value.trim(),
-    edad:      Number(document.querySelector('#edad').value),
-    matricula: document.querySelector('#matricula').value.trim()
-  };
-
-  const url    = modoEdicion
-    ? `/api/alumnos/${matriculaEditando}`
-    : '/api/alumnos';
-  const method = modoEdicion ? 'PUT' : 'POST';
-
-  try {
-    const res = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(datos)
-    });
-
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-    salirModoEdicion();
-    formAlumno.reset();
-    await cargarAlumnos();
-  } catch (err) {
-    console.error(err);
-    tablaEstado.textContent = `Error: ${err.message}`;
-  }
-});
 
 function salirModoEdicion() {
   modoEdicion = false;
   matriculaEditando = null;
-  document.querySelector('#matricula').readOnly = false;
-  document.querySelector('#form-alumno button[type="submit"]').textContent = 'Registrar';
+
+  const matInput = document.querySelector('#matricula');
+  if (matInput) matInput.readOnly = false;
+
+  const submitBtn = formAlumno?.querySelector('button[type="submit"]');
+  if (submitBtn) submitBtn.textContent = 'Registrar';
+
+  mostrarBotonCancelar(false);
+}
+```
+
+### 9.3 Un único `submit` (⚠️ REEMPLAZA el anterior)
+
+**Borra** el `formAlumno.addEventListener('submit', ...)` viejo. Deja **uno solo** que decida POST o PUT según `modoEdicion`:
+
+```js
+if (formAlumno) {
+  formAlumno.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const datos = {
+      nombre:    document.querySelector('#nombre').value.trim(),
+      edad:      Number(document.querySelector('#edad').value),
+      matricula: document.querySelector('#matricula').value.trim(),
+    };
+
+    // Validación mínima en cliente (sin correo: no lo modela el servidor)
+    if (!datos.nombre || !datos.edad || !datos.matricula) {
+      if (apiResultado) {
+        apiResultado.textContent = 'Completa nombre, edad y matrícula.';
+        apiResultado.classList.add('error');
+      }
+      return;
+    }
+
+    const url    = modoEdicion
+      ? `/api/alumnos/${encodeURIComponent(matriculaEditando)}`
+      : '/api/alumnos';
+    const method = modoEdicion ? 'PUT' : 'POST';
+
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(datos),
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      if (apiResultado) {
+        apiResultado.textContent = `Servidor respondió: ${await res.text()}`;
+        apiResultado.classList.remove('error');
+      }
+
+      salirModoEdicion();
+      formAlumno.reset();
+      await cargarAlumnos();
+    } catch (err) {
+      if (apiResultado) {
+        apiResultado.textContent = `Error: ${err.message}`;
+        apiResultado.classList.add('error');
+      }
+    }
+  });
 }
 ```
 
 ---
 
-## Paso 9 — Eliminar
+## Paso 10 — Eliminar
+
+**Borra** la versión vieja `eliminarAlumno(id)` y deja la que usa matrícula:
 
 ```js
 async function eliminarAlumno(matricula) {
   if (!confirm(`¿Eliminar al alumno con matrícula ${matricula}?`)) return;
 
   try {
-    const res = await fetch(`/api/alumnos/${matricula}`, { method: 'DELETE' });
+    const res = await fetch(`/api/alumnos/${encodeURIComponent(matricula)}`, {
+      method: 'DELETE',
+    });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     await cargarAlumnos();
   } catch (err) {
     console.error(err);
-    tablaEstado.textContent = `Error al eliminar: ${err.message}`;
+    if (tablaEstado) tablaEstado.textContent = `Error al eliminar: ${err.message}`;
   }
 }
 ```
 
 ---
 
-## Paso 10 — Probar el ciclo completo
+## Paso 11 — Botón Actualizar y carga inicial
 
-**Create**
-1. Rellena el formulario.
-2. Envía → 201.
-3. La tabla se refresca.
+Protégelos con `if (...)` para que el script no se caiga en páginas sin tabla:
 
-**Read**
-4. Recarga la página → los datos siguen.
+```js
+if (btnActualizar) {
+  btnActualizar.addEventListener('click', cargarAlumnos);
+}
 
-**Update**
-5. Pulsa **Editar** → el formulario se prellena con los datos.
-6. Cambia el nombre y guarda → 200.
-7. La tabla refleja el cambio.
+if (tbody) {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', cargarAlumnos);
+  } else {
+    cargarAlumnos();
+  }
+}
+```
 
-**Delete**
-8. Pulsa **Eliminar** → confirmación → 200.
-9. La fila desaparece.
-10. Reinicia el servidor → el archivo `usuarios.txt` refleja el cambio.
+> El `if (document.readyState === 'loading')` evita que `cargarAlumnos()` corra antes de que el DOM esté listo si el `<script>` está en el `<head>`.
 
 ---
 
-## Paso 11 — Probar con curl (opcional)
+## Paso 12 — Mini‑reto: botón Cancelar en modo edición
+
+Lo más limpio es **inyectarlo desde JS** la primera vez que se entra en modo edición; así no hay que tocar el HTML:
+
+```js
+let btnCancelar = null;
+
+function mostrarBotonCancelar(visible) {
+  if (!formAlumno) return;
+
+  if (!btnCancelar) {
+    btnCancelar = document.querySelector('#btn-cancelar-edicion');
+
+    if (!btnCancelar) {
+      btnCancelar = document.createElement('button');
+      btnCancelar.type = 'button';
+      btnCancelar.id = 'btn-cancelar-edicion';
+      btnCancelar.textContent = 'Cancelar';
+      btnCancelar.style.marginLeft = '0.5rem';
+
+      const submitBtn = formAlumno.querySelector('button[type="submit"]');
+      if (submitBtn) {
+        submitBtn.insertAdjacentElement('afterend', btnCancelar);
+      } else {
+        formAlumno.appendChild(btnCancelar);
+      }
+
+      btnCancelar.addEventListener('click', () => {
+        formAlumno.reset();
+        salirModoEdicion();
+        if (tablaEstado) tablaEstado.textContent = 'Edición cancelada.';
+      });
+    }
+  }
+
+  btnCancelar.style.display = visible ? 'inline-block' : 'none';
+}
+```
+
+Si prefieres tenerlo en el HTML, añade:
+
+```html
+<button type="button" id="btn-cancelar-edicion" style="display:none; margin-left:0.5rem;">
+  Cancelar
+</button>
+```
+
+…y el JS lo reutilizará en lugar de crearlo.
+
+---
+
+## Paso 13 — Probar el ciclo completo
+
+**Create**
+1. Rellena el formulario.
+2. Envía → debe responder **201**.
+3. La tabla se refresca y aparece **una sola fila** (si aparecen dos, el submit viejo no se borró — vuelve al Paso 0/Paso 9.3).
+
+**Read**
+4. Recarga la página → los datos siguen ahí (`usuarios.txt` los persiste).
+
+**Update**
+5. Pulsa **Editar** → el formulario se prellena y aparece **Cancelar**.
+6. Cambia el nombre y guarda → **200**.
+7. La tabla refleja el cambio **sin duplicar** la fila.
+
+**Delete**
+8. Pulsa **Eliminar** → `confirm()` → **200**.
+9. La fila desaparece.
+10. Reinicia el servidor → `usuarios.txt` refleja el borrado.
+
+---
+
+## Paso 14 — Probar con `curl` (opcional)
 
 ```bash
 # Crear
@@ -779,17 +962,19 @@ Verifica en la consola del servidor y en `usuarios.txt` que todo se aplicó.
 
 ## ✅ Checklist de la Actividad 31
 
-- [ ] POST responde 201 con el recurso creado.
-- [ ] POST con matrícula duplicada responde 409.
-- [ ] GET `/api/alumnos` responde el arreglo completo.
-- [ ] PUT sobre matrícula existente responde 200 y actualiza.
-- [ ] PUT sobre matrícula inexistente responde 404.
-- [ ] DELETE sobre existente responde 200.
-- [ ] DELETE sobre inexistente responde 404.
+- [ ] El código viejo (`render`, `actualizarResumen`, `alumnos`, `cuerpoTabla` listener, `formAlumno` submit anterior) **fue eliminado** antes de añadir el nuevo.
+- [ ] `modoEdicion` y `matriculaEditando` están **declarados** con `let` al inicio del archivo.
+- [ ] Solo hay **un** `submit` sobre `formAlumno` y **un** `click` sobre `tbody`.
+- [ ] POST responde **201** con el recurso creado.
+- [ ] POST con matrícula duplicada responde **409**.
+- [ ] GET `/api/alumnos` responde el arreglo completo (incluso si está vacío `[]`).
+- [ ] PUT sobre matrícula existente responde **200** y actualiza.
+- [ ] PUT sobre matrícula inexistente responde **404**.
+- [ ] DELETE sobre existente responde **200**.
+- [ ] DELETE sobre inexistente responde **404**.
 - [ ] `usuarios.txt` refleja cada operación.
-- [ ] El botón Editar prellena el formulario y envía PUT.
-- [ ] El botón Eliminar pide confirmación antes de borrar.
+- [ ] La tabla se pinta con **4 columnas** y sin errores en consola al estar vacía.
+- [ ] El botón **Editar** prellena el formulario y envía PUT.
+- [ ] El botón **Eliminar** pide confirmación antes de borrar.
 - [ ] Tras cualquier operación exitosa, la tabla se refresca.
-
-## 🧠 Mini-reto
-Añade un botón **Cancelar** al lado de "Guardar cambios" cuando estés en modo edición. Al pulsarlo, limpia el formulario y vuelve al modo "Registrar".
+- [ ] **Mini‑reto:** al editar aparece un botón **Cancelar** que limpia el formulario y vuelve al modo “Registrar”.
